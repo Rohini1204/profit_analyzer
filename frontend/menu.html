@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Profit Analyzer Dashboard</title>
+    <link rel="stylesheet" href="css/menu.css">
+</head>
+<body>
+
+<div class="container">
+    <h1>Profit Analyzer Dashboard</h1>
+
+    <div class="card-container">
+        <div class="card" onclick="goAnalysis()">
+            <div class="icon">📊</div>
+            <h2>Data Analysis</h2>
+            <p>Upload CSV and view insights</p>
+        </div>
+
+        <div class="card" onclick="goManualData()">
+            <div class="icon">🧾</div>
+            <h2>Manual Data Analysis</h2>
+            <p>Enter rows manually, save CSV and analyze</p>
+        </div>
+
+        <div class="card" onclick="goForecast()">
+            <div class="icon">📈</div>
+            <h2>ML Sales Forecast</h2>
+            <p>Prediction using ML model</p>
+        </div>
+    </div>
+
+    <button class="logout-btn" onclick="logout()">Logout</button>
+</div>
+
+<script>
+function goAnalysis() {
+    window.location.href = "dashboard.html";
+}
+
+function goForecast() {
+    window.location.href = "forecast.html";
+}
+
+function goManualData() {
+    window.location.href = "manual_data_analysis.html";
+}
+
+function logout() {
+    localStorage.removeItem("token");
+    window.location.href = "login.html";
+}
+
+const token = localStorage.getItem("token");
+if (!token) {
+    window.location.href = "login.html";
+}
+</script>
+
+</body>
+</html>

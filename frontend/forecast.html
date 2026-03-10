@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sales & Profit Forecast</title>
+    <link rel="stylesheet" href="css/forecast.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="js/analysis.js" defer></script>
+</head>
+<body>
+
+<div class="layout">
+
+    <div class="sidebar">
+        <h2>Business Panel</h2>
+        <a href="dashboard.html">Bulk Data Analysis</a>
+        <a href="manual_data_analysis.html">Manual Data Analysis</a>
+        <a href="forecast.html" class="active">AI Prediction</a>
+        <div class="download-panel">
+            <h3>Download Reports</h3>
+            <button id="downloadAnalysisPdfBtn" class="download-btn" disabled>Analysis PDF</button>
+            <button id="downloadAnalysisDocBtn" class="download-btn" disabled>Analysis DOC</button>
+            <button id="downloadForecastPdfBtn" class="download-btn" disabled>Forecast PDF</button>
+            <button id="downloadForecastDocBtn" class="download-btn" disabled>Forecast DOC</button>
+        </div>
+        <a href="profile.html">My Profile</a>
+        <a href="#" onclick="logout()">Logout</a>
+    </div>
+
+    <div class="main-content">
+
+        <h1>6-Month Sales & Profit Forecast</h1>
+
+        <div class="upload-section">
+            <input type="file" id="fileInput" accept=".csv">
+            <button id="forecastBtn">Generate Forecast</button>
+        </div>
+        <p id="modelStatus">Model status: waiting for forecast request.</p>
+        <p id="forecastNote"></p>
+
+        <!-- SALES FORECAST -->
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3>Sales Forecast</h3>
+        <select id="salesDuration">
+            <option value="30">1 Month</option>
+            <option value="60">2 Months</option>
+            <option value="180" selected>6 Months</option>
+        </select>
+    </div>
+    <div id="salesChart" style="height:400px;"></div>
+</div>
+
+<!-- PROFIT FORECAST -->
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3>Profit Forecast</h3>
+        <select id="profitDuration">
+            <option value="30">1 Month</option>
+            <option value="60">2 Months</option>
+            <option value="180" selected>6 Months</option>
+        </select>
+    </div>
+    <div id="profitChart" style="height:400px;"></div>
+</div>
+
+<!-- CUMULATIVE SALES -->
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3>Cumulative Revenue Growth</h3>
+        <select id="cumulativeSalesDuration">
+            <option value="30">1 Month</option>
+            <option value="60">2 Months</option>
+            <option value="180" selected>6 Months</option>
+        </select>
+    </div>
+    <div id="cumulativeSalesChart" style="height:400px;"></div>
+</div>
+
+<!-- CUMULATIVE PROFIT -->
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3>Cumulative Profit Growth</h3>
+        <select id="cumulativeProfitDuration">
+            <option value="30">1 Month</option>
+            <option value="60">2 Months</option>
+            <option value="180" selected>6 Months</option>
+        </select>
+    </div>
+    <div id="cumulativeProfitChart" style="height:400px;"></div>
+</div>
+<div class="info-box" id="categoryBox" style="display:none;">
+    <h3>Category Breakdown</h3>
+    <p id="categoryResult"></p>
+</div>
+
+    </div>
+
+</div>
+
+</body>
+</html>

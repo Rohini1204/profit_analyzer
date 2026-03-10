@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Register | Profit Analyzer</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+<div class="form-box">
+
+    <h2>Register</h2>
+
+    <form id="registerForm">
+
+        <input type="text" id="regName"
+               placeholder="Full Name" required>
+
+        <input type="email" id="regEmail"
+               placeholder="Email" required>
+
+        <input type="password" id="regPassword"
+               placeholder="Password" required>
+
+        <label class="type-label">Register As</label>
+
+        <select id="regRole">
+            <option value="user">User</option>
+            <option value="business">Business Owner</option>
+        </select>
+
+        <input type="text" id="regBusiness"
+               placeholder="Business Name (Optional)">
+
+        <button type="submit" class="btn register-btn">
+            Register
+        </button>
+
+    </form>
+
+    <p id="regMsg"></p>
+
+    <p class="link-text">
+        Already registered?
+        <a href="login.html">Login</a>
+    </p>
+
+</div>
+
+<script src="js/main.js"></script>
+</body>
+</html>

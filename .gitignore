@@ -1,0 +1,22 @@
+# Environment variables (contains passwords)
+.env
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Jupyter checkpoints (if any)
+.ipynb_checkpoints/
+
+# Logs
+*.log

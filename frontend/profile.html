@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>My Profile</title>
+    <link rel="stylesheet" href="css/profile.css">
+    <script src="js/profile.js" defer></script>
+</head>
+<body>
+<div class="layout">
+    <div class="sidebar">
+        <h2>Business Panel</h2>
+        <a href="dashboard.html">Bulk Data Analysis</a>
+        <a href="manual_data_analysis.html">Manual Data Analysis</a>
+        <a href="forecast.html">AI Prediction</a>
+        <a href="profile.html" class="active">My Profile</a>
+        <a href="#" onclick="logout()">Logout</a>
+    </div>
+
+    <div class="main-content">
+        <h1>My Profile</h1>
+
+        <div class="card">
+            <div class="card-head">
+                <h3>Account Details</h3>
+                <span id="profileStatus" class="status">Loading profile...</span>
+            </div>
+
+            <div class="readonly-grid">
+                <div class="readonly-item">
+                    <p class="label">User ID</p>
+                    <p id="userIdText">--</p>
+                </div>
+                <div class="readonly-item">
+                    <p class="label">Current Email</p>
+                    <p id="currentEmailText">--</p>
+                </div>
+                <div class="readonly-item">
+                    <p class="label">Password</p>
+                    <p id="passwordText">**********</p>
+                </div>
+            </div>
+
+            <form id="profileForm">
+                <div class="form-grid">
+                    <div class="field">
+                        <label for="profileName">Edit Name</label>
+                        <input id="profileName" type="text" required>
+                    </div>
+
+                    <div class="field">
+                        <label for="profileEmail">Edit Email</label>
+                        <input id="profileEmail" type="email" required>
+                    </div>
+
+                    <div class="field">
+                        <label for="profileRole">Edit Role</label>
+                        <select id="profileRole" required>
+                            <option value="user">User</option>
+                            <option value="business">Business</option>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label for="profileBusiness">Edit Business Name</label>
+                        <input id="profileBusiness" type="text" placeholder="Enter business name">
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button type="submit" class="btn">Save Changes</button>
+                </div>
+            </form>
+
+            <p id="profileMsg" class="message"></p>
+        </div>
+    </div>
+</div>
+</body>
+</html>

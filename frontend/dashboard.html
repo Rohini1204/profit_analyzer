@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Business Analytics Dashboard</title>
+    <link rel="stylesheet" href="css/forecast.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="js/analysis.js" defer></script>
+</head>
+<body>
+
+<div class="layout">
+    <div class="sidebar">
+        <h2>Business Panel</h2>
+        <a href="dashboard.html" class="active">Bulk Data Analysis</a>
+        <a href="manual_data_analysis.html">Manual Data Analysis</a>
+        <a href="forecast.html">AI Prediction</a>
+        <div class="download-panel">
+            <h3>Download Reports</h3>
+            <button id="downloadAnalysisPdfBtn" class="download-btn" disabled>Analysis PDF</button>
+            <button id="downloadAnalysisDocBtn" class="download-btn" disabled>Analysis DOC</button>
+            <button id="downloadForecastPdfBtn" class="download-btn" disabled>Forecast PDF</button>
+            <button id="downloadForecastDocBtn" class="download-btn" disabled>Forecast DOC</button>
+        </div>
+        <a href="profile.html">My Profile</a>
+        <a href="#" onclick="logout()">Logout</a>
+    </div>
+
+    <div class="main-content">
+        <h1>Advanced Business Analytics Dashboard</h1>
+
+        <div class="upload-section">
+            <input type="file" id="fileInput" accept=".csv">
+            <button id="analyzeBtn">Analyze Data</button>
+        </div>
+
+        <div class="summary-grid">
+            <div class="summary-box">
+                <h3>Total Revenue</h3>
+                <p id="rev">--</p>
+            </div>
+            <div class="summary-box">
+                <h3>Total Profit</h3>
+                <p id="profit">--</p>
+            </div>
+            <div class="summary-box">
+                <h3>Profit Margin</h3>
+                <p id="margin">--</p>
+            </div>
+            <div class="summary-box">
+                <h3>Avg Order Value</h3>
+                <p id="avg">--</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Descriptive Statistics</h3>
+            <div class="metrics-grid">
+                <p>Mean Revenue: <strong id="mean">--</strong></p>
+                <p>Median Revenue: <strong id="median">--</strong></p>
+                <p>Standard Deviation: <strong id="std">--</strong></p>
+                <p>Highest Revenue Day: <strong id="maxday">--</strong></p>
+                <p>Lowest Revenue Day: <strong id="minday">--</strong></p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Monthly Revenue & Profit Trend</h3>
+            <div id="monthlyChart"></div>
+        </div>
+
+        <div class="card">
+            <h3>Revenue Contribution</h3>
+            <div id="pieChart"></div>
+        </div>
+
+        <div class="card">
+            <h3>Correlation Heatmap</h3>
+            <div id="corrChart"></div>
+        </div>
+
+        <div class="card">
+            <h3>Top 3 Revenue Products</h3>
+            <pre id="topRevenue">--</pre>
+        </div>
+
+        <div class="card">
+            <h3>Top 3 Profit Products</h3>
+            <pre id="topProfit">--</pre>
+        </div>
+
+        <div class="card">
+            <h3>Bottom 3 Profit Products</h3>
+            <pre id="bottomProfit">--</pre>
+        </div>
+
+        <div class="info-box">
+            <h3>Business Insight</h3>
+            <p id="insight">--</p>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

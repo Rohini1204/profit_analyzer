@@ -1,0 +1,187 @@
+/* Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+
+/* Body */
+body {
+    font-family: "Segoe UI", Arial, sans-serif;
+
+    background: linear-gradient(135deg, #1f4037, #99f2c8);
+
+    min-height: 100vh;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+
+/* Home Container */
+.container {
+
+    background: white;
+
+    width: 450px;
+    max-width: 90%;
+
+    padding: 40px 35px;
+
+    border-radius: 12px;
+
+    text-align: center;
+
+    box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+}
+
+
+/* Titles */
+.container h1 {
+    color: #1f4037;
+    margin-bottom: 15px;
+}
+
+.subtitle {
+    font-size: 17px;
+    font-weight: 600;
+    color: #444;
+
+    margin-bottom: 10px;
+}
+
+.desc {
+    font-size: 14px;
+    color: #666;
+
+    margin-bottom: 25px;
+}
+
+
+/* Buttons */
+.btn-group {
+    margin-top: 20px;
+}
+
+.btn {
+    display: inline-block;
+
+    padding: 12px 25px;
+
+    margin: 8px;
+
+    text-decoration: none;
+
+    font-weight: bold;
+    font-size: 15px;
+
+    color: white;
+
+    border-radius: 6px;
+
+    border: none;
+    cursor: pointer;
+
+    transition: 0.3s;
+}
+
+
+/* Login Button */
+.login-btn {
+    background: #1f4037;
+}
+
+.login-btn:hover {
+    background: #163029;
+    transform: translateY(-2px);
+}
+
+
+/* Register Button */
+.register-btn {
+    background: #27ae60;
+}
+
+.register-btn:hover {
+    background: #1e874b;
+    transform: translateY(-2px);
+}
+
+
+/* Form Box */
+.form-box {
+
+    background: white;
+
+    width: 380px;
+
+    padding: 35px 30px;
+
+    border-radius: 12px;
+
+    text-align: center;
+
+    box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+}
+
+
+/* Form Title */
+.form-box h2 {
+    margin-bottom: 20px;
+    color: #1f4037;
+}
+
+
+/* Inputs */
+.form-box input,
+.form-box select {
+
+    width: 100%;
+
+    padding: 10px 12px;
+
+    margin: 8px 0;
+
+    border-radius: 5px;
+
+    border: 1px solid #ccc;
+
+    font-size: 14px;
+}
+
+.form-box input:focus,
+.form-box select:focus {
+    outline: none;
+    border-color: #27ae60;
+}
+
+
+/* Register Type Label */
+.type-label {
+    display: block;
+    text-align: left;
+
+    font-size: 14px;
+    color: #444;
+
+    margin-top: 10px;
+}
+
+
+/* Links */
+.link-text {
+    margin-top: 15px;
+    font-size: 13px;
+}
+
+.link-text a {
+    color: #27ae60;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.link-text a:hover {
+    text-decoration: underline;
+}

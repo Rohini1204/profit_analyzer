@@ -1,0 +1,147 @@
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: linear-gradient(to right, #2f6f57, #8fd3b6);
+}
+
+.layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+.sidebar {
+    width: 220px;
+    background-color: #1f8a70;
+    padding: 30px 20px;
+    color: white;
+}
+
+.sidebar h2 {
+    margin-bottom: 30px;
+}
+
+.sidebar a {
+    display: block;
+    color: white;
+    text-decoration: none;
+    margin: 15px 0;
+    font-weight: 500;
+}
+
+.sidebar a.active {
+    font-weight: bold;
+}
+
+.main-content {
+    flex: 1;
+    padding: 40px;
+}
+
+h1 {
+    margin-bottom: 20px;
+}
+
+.card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    padding: 28px;
+}
+
+.card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+}
+
+.status {
+    background: #e7f6ef;
+    color: #146548;
+    border: 1px solid #b6e0cd;
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.readonly-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.readonly-item {
+    background: #f7faf8;
+    border: 1px solid #dfe9e3;
+    border-radius: 10px;
+    padding: 12px;
+}
+
+.label {
+    margin: 0 0 4px;
+    color: #2c5a4b;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.readonly-item p {
+    margin: 0;
+    font-weight: 600;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(240px, 1fr));
+    gap: 14px;
+}
+
+.field label {
+    display: block;
+    margin-bottom: 6px;
+    color: #155746;
+    font-weight: 700;
+}
+
+.field input,
+.field select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #cbd9d1;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.actions {
+    margin-top: 20px;
+}
+
+.btn {
+    background: #1f8a70;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.btn:hover {
+    background: #156a55;
+}
+
+.message {
+    min-height: 22px;
+    margin-top: 14px;
+    color: #1f4037;
+}
+
+@media (max-width: 900px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+}

@@ -1,0 +1,9 @@
+Flask
+flask-cors
+flask-jwt-extended
+pandas
+numpy
+scikit-learn
+mysql-connector-python
+python-dotenv
+gunicorn

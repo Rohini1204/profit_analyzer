@@ -1,0 +1,91 @@
+/* Dashboard Layout Enhancements */
+
+.wide-box {
+    width: 900px;
+    max-width: 95%;
+}
+
+
+/* File input styling  */
+#fileInput {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+
+    border-radius: 6px;
+    border: 1px solid #ccc;
+}
+
+
+/* Upload button spacing */
+#analyzeBtn {
+    margin-top: 15px;
+}
+
+
+/* Table Styling */
+table {
+    width: 100%;
+    margin-top: 25px;
+
+    border-collapse: collapse;
+
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+th, td {
+    padding: 12px;
+    text-align: center;
+    border-bottom: 1px solid #eee;
+}
+
+th {
+    background: #1f4037;
+    color: white;
+    font-weight: 600;
+}
+
+tr:nth-child(even) {
+    background-color: #f7f7f7;
+}
+
+tr:hover {
+    background-color: #eafaf1;
+}
+
+
+/* Logout button */
+button.login-btn {
+    margin-top: 25px;
+}
+
+.stats {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    margin-bottom: 30px;
+}
+
+.card {
+    background: white;
+    padding: 20px;
+    width: 22%;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.card h3 {
+    color: #1f4037;
+    font-size: 16px;
+}
+
+.card p {
+    font-size: 20px;
+    font-weight: bold;
+    margin-top: 10px;
+}
