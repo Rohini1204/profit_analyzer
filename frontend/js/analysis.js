@@ -46,6 +46,13 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
+    const downloadTemplateBtn = document.getElementById("downloadTemplateBtn");
+    if (downloadTemplateBtn) {
+        downloadTemplateBtn.addEventListener("click", function () {
+            downloadAnalysisTemplate();
+        });
+    }
+
     let fullLabels = [];
     let fullSales = [];
     let fullProfit = [];
@@ -861,6 +868,46 @@ function downloadDocBlob(html, filename) {
     const link = document.createElement("a");
     link.href = url;
     link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
+function downloadAnalysisTemplate() {
+    const headers = ["date", "sales", "expenses", "profit", "category"];
+    const tableHtml = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office"
+              xmlns:x="urn:schemas-microsoft-com:office:excel"
+              xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+            <meta charset="utf-8">
+            <!--[if gte mso 9]>
+            <xml>
+                <x:ExcelWorkbook>
+                    <x:ExcelWorksheets>
+                        <x:ExcelWorksheet>
+                            <x:Name>Template</x:Name>
+                            <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+                        </x:ExcelWorksheet>
+                    </x:ExcelWorksheets>
+                </x:ExcelWorkbook>
+            </xml>
+            <![endif]-->
+        </head>
+        <body>
+            <table border="1">
+                <tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr>
+            </table>
+        </body>
+        </html>
+    `;
+
+    const blob = new Blob([tableHtml], { type: "application/vnd.ms-excel" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "bulk-data-analysis-template.xls";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
