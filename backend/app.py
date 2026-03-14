@@ -25,6 +25,44 @@ app.config["JWT_HEADER_TYPE"] = "Bearer"
 
 jwt = JWTManager(app)
 
+
+def init_db():
+    db = get_db()
+    cur = db.cursor()
+
+    try:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                role TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """
+        )
+
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS businesses (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """
+        )
+
+        db.commit()
+    finally:
+        cur.close()
+        db.close()
+
+
+init_db()
+
 BASE_DIR = os.path.dirname(__file__)
 FRONTEND_PATH = os.path.join(BASE_DIR, "..", "frontend")
 SALES_MODEL_PATH = os.path.join(BASE_DIR, "sales_model.pkl")
