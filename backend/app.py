@@ -4,13 +4,13 @@ from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity
 import os
 import pickle
 import re
+import psycopg2
 from werkzeug.security import check_password_hash, generate_password_hash
-import mysql.connector
 import numpy as np
 import pandas as pd
 
 from auth import login_user, register_user
-from db import get_db
+from db import get_db, get_dict_cursor
 from visualization import generate_dashboard
 
 
@@ -133,7 +133,7 @@ def safe_csv_filename(filename):
 
 def fetch_user_profile(user_id):
     db = get_db()
-    cur = db.cursor(dictionary=True)
+    cur = get_dict_cursor(db)
     cur.execute(
         """
         SELECT
@@ -228,7 +228,7 @@ def update_profile():
         return jsonify({"error": "Invalid role. Allowed roles are: user, business."}), 400
 
     db = get_db()
-    cur = db.cursor(dictionary=True)
+    cur = get_dict_cursor(db)
 
     try:
         cur.execute("SELECT password FROM users WHERE id=%s LIMIT 1", (user_id,))
@@ -269,12 +269,12 @@ def update_profile():
                 )
 
         db.commit()
-    except mysql.connector.IntegrityError:
+    except psycopg2.IntegrityError:
         db.rollback()
         return jsonify({"error": "Email already exists. Use a different email."}), 409
-    except mysql.connector.Error as exc:
+    except psycopg2.Error as exc:
         db.rollback()
-        return jsonify({"error": f"MySQL error: {exc.msg}"}), 500
+        return jsonify({"error": f"Database error: {str(exc).strip()}"}), 500
     finally:
         cur.close()
         db.close()
