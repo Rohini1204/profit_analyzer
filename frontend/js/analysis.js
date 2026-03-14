@@ -324,11 +324,7 @@ function attachForecastImagesToStoredReport(key) {
         return null;
     }
 
-    const chartImages = captureForecastImagesFromDom();
-    report.chart_images = {
-        sales_forecast: chartImages.sales_forecast || "",
-        profit_forecast: chartImages.profit_forecast || "",
-    };
+    report.chart_images = buildForecastChartImages(report);
     localStorage.setItem(key, JSON.stringify(report));
     return report;
 }
@@ -393,7 +389,6 @@ function downloadAnalysisPdf(report) {
 }
 
 function downloadAnalysisDoc(report) {
-    const chartImages = report.chart_images || captureAnalysisImagesFromDom();
     const html = `
         <html>
         <head><meta charset="utf-8"><title>Business Analysis Report</title></head>
@@ -419,10 +414,6 @@ function downloadAnalysisDoc(report) {
             ${renderRankingHtml(report.bottom3_profit)}
             <h2>Business Insight</h2>
             <p>${escapeHtml(report.insight || "No insight generated.")}</p>
-            <h2>Analysis Charts</h2>
-            ${renderDocImageHtml(chartImages.monthly_trend, "Monthly Revenue & Profit Trend")}
-            ${renderDocImageHtml(chartImages.revenue_contribution, "Revenue Contribution")}
-            ${renderDocImageHtml(chartImages.correlation_heatmap, "Correlation Heatmap")}
         </body>
         </html>
     `;
@@ -463,11 +454,10 @@ function downloadForecastPdf(report) {
     ];
 
     writePdfLines(doc, "Business Forecast Report", lines);
-    const chartImages = report.chart_images || captureForecastImagesFromDom();
-    addPdfImages(doc, "Forecast Charts", [
-        chartImages.sales_forecast,
-        chartImages.profit_forecast,
-    ]);
+    const chartImages = hasCompleteForecastChartImages(report.chart_images)
+        ? report.chart_images
+        : buildForecastChartImages(report);
+    addPdfImages(doc, "Forecast Charts", getForecastChartImageEntries(chartImages));
     doc.save(`forecast-report-${buildDateStamp()}.pdf`);
 }
 
@@ -485,9 +475,17 @@ function captureAnalysisImagesFromDom() {
 function captureForecastImagesFromDom() {
     const salesCanvas = document.querySelector("#salesChart canvas");
     const profitCanvas = document.querySelector("#profitChart canvas");
+    const cumulativeSalesCanvas = document.querySelector("#cumulativeSalesChart canvas");
+    const cumulativeProfitCanvas = document.querySelector("#cumulativeProfitChart canvas");
     return {
         sales_forecast: salesCanvas ? salesCanvas.toDataURL("image/png") : "",
         profit_forecast: profitCanvas ? profitCanvas.toDataURL("image/png") : "",
+        cumulative_sales_forecast: cumulativeSalesCanvas
+            ? cumulativeSalesCanvas.toDataURL("image/png")
+            : "",
+        cumulative_profit_forecast: cumulativeProfitCanvas
+            ? cumulativeProfitCanvas.toDataURL("image/png")
+            : "",
     };
 }
 
@@ -495,11 +493,29 @@ function downloadForecastDoc(report) {
     const totalDays = report.labels?.length || 0;
     const avgSales = totalDays > 0 ? report.total_sales_forecast / totalDays : 0;
     const avgProfit = totalDays > 0 ? report.total_profit_forecast / totalDays : 0;
-    const chartImages = report.chart_images || captureForecastImagesFromDom();
-
     const html = `
-        <html>
-        <head><meta charset="utf-8"><title>Business Forecast Report</title></head>
+        <html xmlns:o="urn:schemas-microsoft-com:office:office"
+              xmlns:w="urn:schemas-microsoft-com:office:word"
+              xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+            <meta charset="utf-8">
+            <title>Business Forecast Report</title>
+            <!--[if gte mso 9]>
+            <xml>
+                <w:WordDocument>
+                    <w:View>Print</w:View>
+                    <w:Zoom>100</w:Zoom>
+                </w:WordDocument>
+            </xml>
+            <![endif]-->
+            <style>
+                body { font-family: Calibri, Arial, sans-serif; }
+                table { border-collapse: collapse; }
+                th, td { border: 1px solid #777; padding: 6px; }
+                img { max-width: 100%; height: auto; border: 1px solid #ccc; }
+                .chart-block { margin: 12px 0 18px; page-break-inside: avoid; }
+            </style>
+        </head>
         <body>
             <h1>Business Forecast Report</h1>
             <p><strong>Generated At:</strong> ${escapeHtml(formatIsoDate(report.generated_at))}</p>
@@ -516,9 +532,6 @@ function downloadForecastDoc(report) {
             ${renderCategoryHtml(report.category_breakdown)}
             <h2>Sample Forecast (First 30 Days)</h2>
             ${renderForecastTableHtml(report.labels, report.sales, report.profit, 30)}
-            <h2>Forecast Charts</h2>
-            ${renderDocImageHtml(chartImages.sales_forecast, "Sales Forecast")}
-            ${renderDocImageHtml(chartImages.profit_forecast, "Profit Forecast")}
         </body>
         </html>
     `;
@@ -551,11 +564,17 @@ function writePdfLines(doc, title, lines) {
 }
 
 function addPdfImages(doc, sectionTitle, images) {
-    const validImages = (images || []).filter((img) => typeof img === "string" && img.length > 0);
-    validImages.forEach((img, index) => {
+    const validImages = (images || [])
+        .map((item, index) =>
+            typeof item === "string"
+                ? { image: item, title: `${sectionTitle} ${index + 1}` }
+                : item
+        )
+        .filter((item) => typeof item.image === "string" && item.image.length > 0);
+    validImages.forEach((item, index) => {
         doc.addPage();
         doc.setFontSize(14);
-        doc.text(`${sectionTitle} ${index + 1}`, 12, 14);
+        doc.text(item.title || `${sectionTitle} ${index + 1}`, 12, 14);
 
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
@@ -563,8 +582,8 @@ function addPdfImages(doc, sectionTitle, images) {
         const maxHeight = pageHeight - 30;
 
         try {
-            const imageType = img.includes("image/jpeg") ? "JPEG" : "PNG";
-            const props = doc.getImageProperties(img);
+            const imageType = item.image.includes("image/jpeg") ? "JPEG" : "PNG";
+            const props = doc.getImageProperties(item.image);
             let width = maxWidth;
             let height = (props.height * width) / props.width;
 
@@ -574,12 +593,154 @@ function addPdfImages(doc, sectionTitle, images) {
             }
 
             const x = (pageWidth - width) / 2;
-            doc.addImage(img, imageType, x, 20, width, height);
+            doc.addImage(item.image, imageType, x, 20, width, height);
         } catch {
             doc.setFontSize(11);
             doc.text("Chart image could not be rendered.", 12, 26);
         }
     });
+}
+
+function getForecastDurationConfigs() {
+    return [
+        { key: "1_month", days: 30, label: "1 Month" },
+        { key: "2_months", days: 60, label: "2 Months" },
+        { key: "6_months", days: 180, label: "6 Months" },
+    ];
+}
+
+function buildForecastChartImages(report) {
+    const chartImages = {};
+    getForecastChartDefinitions(report).forEach((definition) => {
+        chartImages[definition.key] = renderChartImage(
+            definition.labels,
+            definition.values,
+            definition.title
+        );
+    });
+    return chartImages;
+}
+
+function hasCompleteForecastChartImages(chartImages) {
+    if (!chartImages) {
+        return false;
+    }
+
+    return getForecastChartDefinitions({ labels: [], sales: [], profit: [] }).every(
+        (definition) => typeof chartImages[definition.key] === "string" && chartImages[definition.key].length > 0
+    );
+}
+
+function getForecastChartDefinitions(report) {
+    const labels = report.labels || [];
+    const sales = report.sales || [];
+    const profit = report.profit || [];
+    const definitions = [];
+
+    getForecastDurationConfigs().forEach((duration) => {
+        const scopedLabels = labels.slice(0, duration.days);
+        const scopedSales = sales.slice(0, duration.days);
+        const scopedProfit = profit.slice(0, duration.days);
+
+        definitions.push({
+            key: `sales_forecast_${duration.key}`,
+            title: `Sales Forecast (${duration.label})`,
+            labels: scopedLabels,
+            values: scopedSales,
+        });
+        definitions.push({
+            key: `profit_forecast_${duration.key}`,
+            title: `Profit Forecast (${duration.label})`,
+            labels: scopedLabels,
+            values: scopedProfit,
+        });
+        definitions.push({
+            key: `cumulative_sales_forecast_${duration.key}`,
+            title: `Cumulative Revenue Growth (${duration.label})`,
+            labels: scopedLabels,
+            values: buildCumulativeSeries(scopedSales),
+        });
+        definitions.push({
+            key: `cumulative_profit_forecast_${duration.key}`,
+            title: `Cumulative Profit Growth (${duration.label})`,
+            labels: scopedLabels,
+            values: buildCumulativeSeries(scopedProfit),
+        });
+    });
+
+    return definitions;
+}
+
+function buildCumulativeSeries(values) {
+    const cumulative = [];
+    let runningTotal = 0;
+    (values || []).forEach((value) => {
+        runningTotal += Number(value) || 0;
+        cumulative.push(runningTotal);
+    });
+    return cumulative;
+}
+
+function renderChartImage(labels, values, label) {
+    if (!window.Chart || !values || values.length === 0) {
+        return "";
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = 1200;
+    canvas.height = 600;
+
+    const chart = new Chart(canvas, {
+        type: "line",
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: label,
+                    data: values,
+                    borderWidth: 3,
+                    tension: 0.4,
+                    fill: true,
+                    backgroundColor: "rgba(34,197,94,0.15)",
+                    borderColor: "rgba(34,197,94,1)",
+                    pointRadius: 2,
+                },
+            ],
+        },
+        options: {
+            responsive: false,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: {
+                legend: {
+                    labels: {
+                        font: { size: 14 },
+                    },
+                },
+            },
+            scales: {
+                x: {
+                    ticks: { maxTicksLimit: 15 },
+                },
+            },
+        },
+    });
+
+    chart.update("none");
+    const image = canvas.toDataURL("image/png");
+    chart.destroy();
+    return image;
+}
+
+function getForecastChartImageEntries(chartImages) {
+    return getForecastChartDefinitions({
+        labels: [],
+        sales: [],
+        profit: [],
+    }).map((definition) => ({
+        title: definition.title,
+        image: chartImages?.[definition.key] || "",
+    }));
 }
 
 function toRankingLines(items) {
@@ -662,6 +823,27 @@ function renderForecastTableHtml(labels, sales, profit, limit) {
 }
 
 function renderDocImageHtml(imageSrc, title) {
+    if (Array.isArray(imageSrc)) {
+        const useContentRefs = Boolean(title);
+        return imageSrc
+            .map((entry, index) => {
+                if (!entry?.image) {
+                    return `<p><strong>${escapeHtml(entry?.title || `Chart ${index + 1}`)}:</strong> Image not available.</p>`;
+                }
+
+                const source = useContentRefs
+                    ? `forecast-chart-${index + 1}.png`
+                    : entry.image;
+                return `
+                    <div class="chart-block">
+                        <p><strong>${escapeHtml(entry.title || `Chart ${index + 1}`)}</strong></p>
+                        <img src="${source}" alt="${escapeHtml(entry.title || `Chart ${index + 1}`)}">
+                    </div>
+                `;
+            })
+            .join("");
+    }
+
     if (!imageSrc) {
         return `<p><strong>${escapeHtml(title)}:</strong> Image not available.</p>`;
     }
@@ -683,6 +865,90 @@ function downloadDocBlob(html, filename) {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+}
+
+function downloadWordDocWithImages(html, imageEntries, filename) {
+    const boundary = `----=_NextPart_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    const mhtml = buildMhtmlDocument(html, imageEntries, boundary);
+    const blob = new Blob([mhtml], { type: "application/msword" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
+function buildMhtmlDocument(html, imageEntries, boundary) {
+    const parts = [
+        "MIME-Version: 1.0",
+        `Content-Type: multipart/related; boundary="${boundary}"; type="text/html"`,
+        "",
+        `--${boundary}`,
+        "Content-Type: text/html; charset=\"utf-8\"",
+        "Content-Transfer-Encoding: quoted-printable",
+        "Content-Location: forecast-report.html",
+        "",
+        encodeQuotedPrintable(html),
+    ];
+
+    (imageEntries || []).forEach((entry, index) => {
+        const imagePart = getImageMimePart(entry?.image, `forecast-chart-${index + 1}.png`, boundary);
+        if (imagePart) {
+            parts.push(imagePart);
+        }
+    });
+
+    parts.push(`--${boundary}--`, "");
+    return parts.join("\r\n");
+}
+
+function getImageMimePart(dataUrl, contentLocation, boundary) {
+    if (!dataUrl || typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
+        return "";
+    }
+
+    const splitIndex = dataUrl.indexOf(",");
+    if (splitIndex === -1) {
+        return "";
+    }
+
+    const header = dataUrl.slice(0, splitIndex);
+    const body = dataUrl.slice(splitIndex + 1);
+    const mimeMatch = header.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64$/);
+    if (!mimeMatch) {
+        return "";
+    }
+
+    return [
+        `--${boundary}`,
+        `Content-Type: ${mimeMatch[1]}`,
+        "Content-Transfer-Encoding: base64",
+        `Content-Location: ${contentLocation}`,
+        "",
+        wrapBase64(body),
+    ].join("\r\n");
+}
+
+function wrapBase64(value) {
+    return String(value || "").replace(/(.{76})/g, "$1\r\n");
+}
+
+function encodeQuotedPrintable(value) {
+    return String(value || "")
+        .replace(/=/g, "=3D")
+        .replace(/[^\x20-\x3C\x3E-\x7E]/g, (char) => {
+            const code = char.charCodeAt(0);
+            if (code === 10) {
+                return "\r\n";
+            }
+            if (code === 13) {
+                return "";
+            }
+            return `=${code.toString(16).toUpperCase().padStart(2, "0")}`;
+        });
 }
 
 function formatCurrency(value) {

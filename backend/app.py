@@ -4,9 +4,7 @@ from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity
 import os
 import pickle
 import re
-from dotenv import load_dotenv
-load_dotenv()
-
+from werkzeug.security import check_password_hash, generate_password_hash
 import mysql.connector
 import numpy as np
 import pandas as pd
@@ -20,7 +18,7 @@ app = Flask(__name__)
 
 CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
-app.config["JWT_SECRET_KEY"] = "super-secret-key"
+app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "super-secret-key")
 app.config["JWT_TOKEN_LOCATION"] = ["headers"]
 app.config["JWT_HEADER_NAME"] = "Authorization"
 app.config["JWT_HEADER_TYPE"] = "Bearer"
@@ -219,6 +217,8 @@ def update_profile():
     email = str(payload.get("email", "")).strip()
     role = str(payload.get("role", "")).strip().lower()
     business_name = str(payload.get("business_name", "")).strip()
+    current_password = str(payload.get("current_password", ""))
+    new_password = str(payload.get("new_password", ""))
 
     if not name or not email or not role:
         return jsonify({"error": "name, email and role are required"}), 400
@@ -231,13 +231,26 @@ def update_profile():
     cur = db.cursor(dictionary=True)
 
     try:
+        cur.execute("SELECT password FROM users WHERE id=%s LIMIT 1", (user_id,))
+        existing_user = cur.fetchone()
+        if not existing_user:
+            return jsonify({"error": "User not found"}), 404
+
+        update_fields = [("name", name), ("email", email), ("role", role)]
+        if new_password:
+            if not current_password:
+                return jsonify({"error": "Current password is required to set a new password."}), 400
+            if len(new_password) < 6:
+                return jsonify({"error": "New password must be at least 6 characters long."}), 400
+            if not check_password_hash(existing_user["password"], current_password):
+                return jsonify({"error": "Current password is incorrect."}), 400
+            update_fields.append(("password", generate_password_hash(new_password)))
+
+        set_clause = ", ".join(f"{column}=%s" for column, _ in update_fields)
+        update_values = [value for _, value in update_fields]
         cur.execute(
-            """
-            UPDATE users
-            SET name=%s, email=%s, role=%s
-            WHERE id=%s
-            """,
-            (name, email, role, user_id),
+            f"UPDATE users SET {set_clause} WHERE id=%s",
+            (*update_values, user_id),
         )
 
         cur.execute("SELECT id FROM businesses WHERE user_id=%s LIMIT 1", (user_id,))
@@ -414,4 +427,8 @@ def forecast_sales():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", "5000")),
+        debug=os.getenv("FLASK_DEBUG", "false").lower() == "true",
+    )

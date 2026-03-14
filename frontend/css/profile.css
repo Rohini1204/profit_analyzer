@@ -32,6 +32,45 @@ body {
     font-weight: bold;
 }
 
+.download-panel {
+    margin: 20px 0;
+    padding: 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.download-panel h3 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    color: #f3fffa;
+}
+
+.download-btn {
+    width: 100%;
+    margin-bottom: 8px;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 6px;
+    background: #166d56;
+    color: #fff;
+    cursor: pointer;
+    text-align: left;
+    font-size: 13px;
+}
+
+.download-btn:last-child {
+    margin-bottom: 0;
+}
+
+.download-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.download-btn:not(:disabled):hover {
+    background: #115543;
+}
+
 .main-content {
     flex: 1;
     padding: 40px;
@@ -119,6 +158,17 @@ h1 {
     margin-top: 20px;
 }
 
+.password-section {
+    margin-top: 24px;
+    padding-top: 18px;
+    border-top: 1px solid #dfe9e3;
+}
+
+.password-section h3 {
+    margin: 0 0 14px;
+    color: #155746;
+}
+
 .btn {
     background: #1f8a70;
     color: white;
@@ -141,6 +191,10 @@ h1 {
 }
 
 @media (max-width: 900px) {
+    .sidebar {
+        width: 100%;
+    }
+
     .form-grid {
         grid-template-columns: 1fr;
     }

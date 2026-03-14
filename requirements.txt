@@ -1,6 +1,8 @@
 Flask
 flask-cors
 flask-jwt-extended
+matplotlib
+seaborn
 pandas
 numpy
 scikit-learn

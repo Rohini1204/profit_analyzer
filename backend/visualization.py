@@ -96,12 +96,12 @@ def _normalize_input(file):
     return normalized
 
 
-def _plot_to_base64():
+def _figure_to_base64(fig):
     buffer = BytesIO()
-    plt.savefig(buffer, format="png")
+    fig.savefig(buffer, format="png", bbox_inches="tight")
     buffer.seek(0)
     image = base64.b64encode(buffer.getvalue()).decode()
-    plt.close()
+    plt.close(fig)
     return image
 
 
@@ -127,18 +127,21 @@ def generate_dashboard(file):
     min_day = df.loc[df["Revenue"].idxmin()]["Date"].strftime("%d-%m-%y")
 
     monthly = df.groupby("Month")[["Revenue", "Profit"]].sum()
-    plt.figure(figsize=(8, 5))
-    monthly.plot(marker="o")
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-    monthly_plot = _plot_to_base64()
+    fig, ax = plt.subplots(figsize=(8, 5))
+    monthly.plot(marker="o", ax=ax)
+    ax.set_xlabel("Month")
+    ax.set_ylabel("Amount")
+    ax.tick_params(axis="x", rotation=45)
+    fig.tight_layout()
+    monthly_plot = _figure_to_base64(fig)
 
     contribution = df.groupby("Product")["Revenue"].sum()
     contribution_percent = (contribution / total_revenue) * 100 if total_revenue else contribution
-    plt.figure(figsize=(6, 6))
-    plt.pie(contribution_percent, labels=contribution_percent.index, autopct="%1.1f%%")
-    plt.title("Revenue Contribution %")
-    pie_plot = _plot_to_base64()
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.pie(contribution_percent, labels=contribution_percent.index, autopct="%1.1f%%")
+    ax.set_title("Revenue Contribution %")
+    fig.tight_layout()
+    pie_plot = _figure_to_base64(fig)
 
     top3_revenue = contribution.sort_values(ascending=False).head(3).to_dict()
     top3_profit = (
@@ -147,9 +150,10 @@ def generate_dashboard(file):
     bottom3_profit = df.groupby("Product")["Profit"].sum().sort_values().head(3).to_dict()
 
     corr = df[["Revenue", "Profit", "COGS"]].corr()
-    plt.figure(figsize=(5, 4))
-    sns.heatmap(corr, annot=True, cmap="coolwarm")
-    corr_plot = _plot_to_base64()
+    fig, ax = plt.subplots(figsize=(5, 4))
+    sns.heatmap(corr, annot=True, cmap="coolwarm", ax=ax)
+    fig.tight_layout()
+    corr_plot = _figure_to_base64(fig)
 
     best_product = contribution.idxmax()
     insight = (

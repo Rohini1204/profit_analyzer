@@ -1,4 +1,4 @@
-const API = "http://localhost:5000/api";
+const PROFILE_API = "http://localhost:5000/api";
 
 document.addEventListener("DOMContentLoaded", () => {
     const token = localStorage.getItem("token");
@@ -21,9 +21,29 @@ document.addEventListener("DOMContentLoaded", () => {
             role: document.getElementById("profileRole").value.toLowerCase(),
             business_name: document.getElementById("profileBusiness").value.trim(),
         };
+        const currentPassword = document.getElementById("currentPassword").value;
+        const newPassword = document.getElementById("newPassword").value;
+        const confirmPassword = document.getElementById("confirmPassword").value;
+
+        if (currentPassword || newPassword || confirmPassword) {
+            if (!currentPassword || !newPassword || !confirmPassword) {
+                setStatus("Update failed");
+                setMessage("Fill current, new, and confirm password fields to change password.", true);
+                return;
+            }
+
+            if (newPassword !== confirmPassword) {
+                setStatus("Update failed");
+                setMessage("New password and confirm password do not match.", true);
+                return;
+            }
+
+            payload.current_password = currentPassword;
+            payload.new_password = newPassword;
+        }
 
         try {
-            const response = await fetch(API + "/profile", {
+            const response = await fetch(PROFILE_API + "/profile", {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
@@ -40,6 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             fillProfile(data.profile);
+            resetPasswordInputs();
             setStatus("Saved");
             setMessage(data.msg || "Profile updated successfully.");
         } catch (error) {
@@ -51,7 +72,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function loadProfile(token) {
     try {
-        const response = await fetch(API + "/profile", {
+        const response = await fetch(PROFILE_API + "/profile", {
             method: "GET",
             headers: { Authorization: "Bearer " + token },
         });
@@ -93,6 +114,12 @@ function setMessage(message, isError = false) {
 
 function setStatus(value) {
     document.getElementById("profileStatus").innerText = value;
+}
+
+function resetPasswordInputs() {
+    document.getElementById("currentPassword").value = "";
+    document.getElementById("newPassword").value = "";
+    document.getElementById("confirmPassword").value = "";
 }
 
 function logout() {
