@@ -1,5 +1,6 @@
 document.addEventListener("DOMContentLoaded", function () {
-    const API = "http://localhost:5000/api";
+    // const API = "http://localhost:5000/api";
+    const API = "/api";
     const token = localStorage.getItem("token");
     const ANALYSIS_STORAGE_KEY = "pa_analysis_report";
     const FORECAST_STORAGE_KEY = "pa_forecast_report";

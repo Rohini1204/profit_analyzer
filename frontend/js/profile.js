@@ -1,5 +1,5 @@
-const PROFILE_API = "http://localhost:5000/api";
-
+// const PROFILE_API = "http://localhost:5000/api";
+const API = "/api";
 document.addEventListener("DOMContentLoaded", () => {
     const token = localStorage.getItem("token");
     if (!token) {
