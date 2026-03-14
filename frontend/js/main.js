@@ -1,4 +1,5 @@
-const API = "http://localhost:5000/api";
+// const API = "http://localhost:5000/api";
+const API = "/api";
 
 // LOGIN 
 
