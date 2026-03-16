@@ -4,6 +4,7 @@ from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity
 import os
 import pickle
 import re
+import time
 import psycopg2
 from werkzeug.security import check_password_hash, generate_password_hash
 import numpy as np
@@ -42,14 +43,14 @@ def init_db():
                 password TEXT NOT NULL,
                 role TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                login_time TIMESTAMP,
-                logout_time TIMESTAMP
+                time_spent_minutes INTEGER DEFAULT 0
             );
             """
         )
 
-        cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS login_time TIMESTAMP;")
-        cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS logout_time TIMESTAMP;")
+        cur.execute(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS time_spent_minutes INTEGER DEFAULT 0;"
+        )
 
         cur.execute(
             """
@@ -220,7 +221,7 @@ def manager_access_granted():
 
 def serialize_user_row(row):
     serialized = dict(row)
-    for key in ("created_at", "login_time", "logout_time"):
+    for key in ("created_at",):
         value = serialized.get(key)
         serialized[key] = value.isoformat() if value else None
     return serialized
@@ -397,17 +398,7 @@ def login():
     if not user:
         return jsonify({"msg": "Invalid Login"}), 401
 
-    db = get_db()
-    cur = db.cursor()
-    try:
-        cur.execute(
-            "UPDATE users SET login_time=CURRENT_TIMESTAMP, logout_time=NULL WHERE id=%s",
-            (user["id"],),
-        )
-        db.commit()
-    finally:
-        cur.close()
-        db.close()
+    session["login_start_time"] = time.time()
 
     token = create_access_token(identity=str(user["id"]))
     return jsonify({"token": token})
@@ -417,15 +408,33 @@ def login():
 @jwt_required()
 def logout():
     user_id = int(get_jwt_identity())
-    db = get_db()
-    cur = db.cursor()
+    login_start_time = session.pop("login_start_time", None)
+    elapsed_minutes = 0
 
-    try:
-        cur.execute("UPDATE users SET logout_time=CURRENT_TIMESTAMP WHERE id=%s", (user_id,))
-        db.commit()
-    finally:
-        cur.close()
-        db.close()
+    if login_start_time is not None:
+        try:
+            elapsed_seconds = max(0, int(time.time() - float(login_start_time)))
+            elapsed_minutes = elapsed_seconds // 60
+        except (TypeError, ValueError):
+            elapsed_minutes = 0
+
+    if elapsed_minutes > 0:
+        db = get_db()
+        cur = db.cursor()
+
+        try:
+            cur.execute(
+                """
+                UPDATE users
+                SET time_spent_minutes = COALESCE(time_spent_minutes, 0) + %s
+                WHERE id=%s
+                """,
+                (elapsed_minutes, user_id),
+            )
+            db.commit()
+        finally:
+            cur.close()
+            db.close()
 
     return jsonify({"msg": "Logged out successfully"})
 
@@ -492,19 +501,12 @@ def get_manager_users():
                 name,
                 email,
                 role,
-                created_at,
-                login_time,
-                logout_time,
-                CASE
-                    WHEN login_time IS NOT NULL AND logout_time IS NOT NULL
-                    THEN (logout_time - login_time)::text
-                    ELSE NULL
-                END AS session_duration
+                COALESCE(time_spent_minutes, 0) AS time_spent_minutes
             FROM users
             ORDER BY id ASC
             """
         )
-        users = [serialize_user_row(row) for row in cur.fetchall()]
+        users = [dict(row) for row in cur.fetchall()]
     finally:
         cur.close()
         db.close()

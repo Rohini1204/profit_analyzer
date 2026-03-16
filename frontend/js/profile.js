@@ -172,7 +172,7 @@ async function loadManagerUsers() {
     const dashboard = document.getElementById("managerDashboard");
     const tbody = document.getElementById("managerUsersBody");
     dashboard.style.display = "block";
-    tbody.innerHTML = '<tr><td colspan="8">Loading users...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6">Loading users...</td></tr>';
 
     try {
         const response = await fetch(API + "/manager/users", {
@@ -200,7 +200,7 @@ function renderManagerUsers(users) {
     const tbody = document.getElementById("managerUsersBody");
 
     if (!users.length) {
-        tbody.innerHTML = '<tr><td colspan="8">No users found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6">No users found.</td></tr>';
         return;
     }
 
@@ -212,9 +212,7 @@ function renderManagerUsers(users) {
                     <td style="padding: 10px 8px; border-top: 1px solid #dfe9e3;">${escapeHtml(user.name || "")}</td>
                     <td style="padding: 10px 8px; border-top: 1px solid #dfe9e3;">${escapeHtml(user.email || "")}</td>
                     <td style="padding: 10px 8px; border-top: 1px solid #dfe9e3;">${escapeHtml(user.role || "")}</td>
-                    <td style="padding: 10px 8px; border-top: 1px solid #dfe9e3;">${formatDateTime(user.login_time)}</td>
-                    <td style="padding: 10px 8px; border-top: 1px solid #dfe9e3;">${formatDateTime(user.logout_time)}</td>
-                    <td style="padding: 10px 8px; border-top: 1px solid #dfe9e3;">${escapeHtml(user.session_duration || "--")}</td>
+                    <td style="padding: 10px 8px; border-top: 1px solid #dfe9e3;">${Number(user.time_spent_minutes || 0)}</td>
                     <td style="padding: 10px 8px; border-top: 1px solid #dfe9e3;">
                         <button type="button" class="btn manager-reset-toggle" data-user-id="${user.id}">Reset Password</button>
                         <div id="resetPanel-${user.id}" style="display: none; margin-top: 10px;">
@@ -290,19 +288,6 @@ function resetPasswordInputs() {
 
 function hideManagerDashboard() {
     document.getElementById("managerDashboard").style.display = "none";
-}
-
-function formatDateTime(value) {
-    if (!value) {
-        return "--";
-    }
-
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) {
-        return value;
-    }
-
-    return parsed.toLocaleString();
 }
 
 function escapeHtml(value) {
