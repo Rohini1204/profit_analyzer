@@ -62,6 +62,18 @@ def init_db():
             """
         )
 
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_datasets (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+                filename TEXT,
+                file_path TEXT,
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """
+        )
+
         db.commit()
     finally:
         cur.close()
@@ -75,7 +87,9 @@ FRONTEND_PATH = os.path.join(BASE_DIR, "..", "frontend")
 SALES_MODEL_PATH = os.path.join(BASE_DIR, "sales_model.pkl")
 PROFIT_MODEL_PATH = os.path.join(BASE_DIR, "profit_model.pkl")
 MANUAL_DATA_DIR = os.path.join(BASE_DIR, "..", "manual_uploads")
+SAVED_DATASET_DIR = os.path.join(BASE_DIR, "..", "saved_datasets")
 os.makedirs(MANUAL_DATA_DIR, exist_ok=True)
+os.makedirs(SAVED_DATASET_DIR, exist_ok=True)
 
 
 def load_model(model_path):
@@ -212,6 +226,147 @@ def serialize_user_row(row):
     return serialized
 
 
+def save_user_dataset(user_id, uploaded_file):
+    original_filename = safe_csv_filename(getattr(uploaded_file, "filename", "dataset.csv"))
+    stored_path = os.path.join(SAVED_DATASET_DIR, f"user_{user_id}_dataset.csv")
+
+    db = get_db()
+    cur = get_dict_cursor(db)
+
+    try:
+        cur.execute("SELECT file_path FROM user_datasets WHERE user_id=%s LIMIT 1", (user_id,))
+        existing = cur.fetchone()
+
+        if existing and existing.get("file_path") and existing["file_path"] != stored_path:
+            old_path = existing["file_path"]
+            if os.path.exists(old_path):
+                os.remove(old_path)
+
+        uploaded_file.save(stored_path)
+
+        cur.execute(
+            """
+            INSERT INTO user_datasets(user_id, filename, file_path, uploaded_at)
+            VALUES(%s, %s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (user_id)
+            DO UPDATE SET
+                filename = EXCLUDED.filename,
+                file_path = EXCLUDED.file_path,
+                uploaded_at = CURRENT_TIMESTAMP
+            """,
+            (user_id, original_filename, stored_path),
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        if os.path.exists(stored_path):
+            os.remove(stored_path)
+        raise
+    finally:
+        cur.close()
+        db.close()
+
+    return {"filename": original_filename, "file_path": stored_path}
+
+
+def fetch_user_dataset(user_id):
+    db = get_db()
+    cur = get_dict_cursor(db)
+
+    try:
+        cur.execute(
+            """
+            SELECT id, user_id, filename, file_path, uploaded_at
+            FROM user_datasets
+            WHERE user_id=%s
+            LIMIT 1
+            """,
+            (user_id,),
+        )
+        row = cur.fetchone()
+    finally:
+        cur.close()
+        db.close()
+
+    if row and row.get("uploaded_at"):
+        row["uploaded_at"] = row["uploaded_at"].isoformat()
+    return row
+
+
+def generate_forecast_result(file_source):
+    if sales_model is None:
+        return {"error": "Sales model not loaded from backend/sales_model.pkl"}, 500
+
+    try:
+        horizon_days = 180
+        _, df = parse_forecast_csv(file_source)
+
+        future_frame = build_future_frame(
+            last_date=df["date"].iloc[-1],
+            base_day_number=int(df["day_number"].iloc[-1]),
+            horizon_days=horizon_days,
+        )
+
+        sales_features = model_features(sales_model) or ["day_number", "month"]
+        sales_pred = sales_model.predict(pick_columns(future_frame, sales_features))
+
+        profit_pred = []
+        profit_features = model_features(profit_model)
+        if profit_model is not None and "expenses" in df.columns:
+            df["profit"] = df["sales"] - df["expenses"]
+            df["lag_1"] = df["profit"].shift(1)
+            df["rolling_7"] = df["profit"].rolling(7).mean()
+            df = df.dropna(subset=["profit", "lag_1", "rolling_7"]).copy()
+
+            if not df.empty:
+                rolling_window = df["profit"].tail(7).tolist()
+                last_profit = float(df["profit"].iloc[-1])
+                expected_profit_features = profit_features or [
+                    "day_number",
+                    "month",
+                    "day_of_week",
+                    "lag_1",
+                    "rolling_7",
+                ]
+
+                for _, row in future_frame.iterrows():
+                    point = row.to_dict()
+                    point["lag_1"] = last_profit
+                    point["rolling_7"] = float(np.mean(rolling_window))
+                    input_df = pd.DataFrame([point])
+                    predicted = float(
+                        profit_model.predict(pick_columns(input_df, expected_profit_features))[0]
+                    )
+                    profit_pred.append(predicted)
+                    rolling_window = (rolling_window + [predicted])[-7:]
+                    last_profit = predicted
+
+        category_breakdown = {}
+        if "category" in df.columns:
+            category_breakdown = df.groupby("category")["sales"].sum().to_dict()
+
+        return (
+            {
+                "future_days_180": future_frame["day_number"].tolist(),
+                "future_dates_180": future_frame["date"].dt.strftime("%Y-%m-%d").tolist(),
+                "sales_6_months": [float(value) for value in sales_pred],
+                "profit_6_months": [float(value) for value in profit_pred],
+                "category_breakdown": category_breakdown,
+                "models_loaded": {
+                    "sales_model": True,
+                    "profit_model": profit_model is not None,
+                    "sales_features": sales_features,
+                    "profit_features": profit_features,
+                },
+            },
+            200,
+        )
+    except ValueError as exc:
+        return {"error": str(exc)}, 400
+    except Exception as exc:
+        return {"error": f"Forecast failed: {str(exc)}"}, 500
+
+
 @app.route("/")
 def home():
     return send_from_directory(FRONTEND_PATH, "index.html")
@@ -273,6 +428,38 @@ def logout():
         db.close()
 
     return jsonify({"msg": "Logged out successfully"})
+
+
+@app.route("/api/user-dataset", methods=["GET"])
+@jwt_required()
+def get_user_dataset():
+    user_id = int(get_jwt_identity())
+    dataset = fetch_user_dataset(user_id)
+
+    if not dataset:
+        return jsonify({"dataset_exists": False})
+
+    response = {
+        "dataset_exists": True,
+        "filename": dataset.get("filename"),
+        "uploaded_at": dataset.get("uploaded_at"),
+    }
+
+    include_analysis = request.args.get("include_analysis", "").lower() in {"1", "true", "yes"}
+    include_forecast = request.args.get("include_forecast", "").lower() in {"1", "true", "yes"}
+    dataset_path = dataset.get("file_path")
+
+    if include_analysis and dataset_path and os.path.exists(dataset_path):
+        analysis_data = generate_dashboard(dataset_path)
+        if "error" not in analysis_data:
+            response["analysis_data"] = analysis_data
+
+    if include_forecast and dataset_path and os.path.exists(dataset_path):
+        forecast_data, status_code = generate_forecast_result(dataset_path)
+        if status_code == 200:
+            response["forecast_data"] = forecast_data
+
+    return jsonify(response)
 
 
 @app.route("/api/manager-login", methods=["POST"])
@@ -471,8 +658,23 @@ def update_profile():
 def analyze_uploaded_file():
     if "file" not in request.files:
         return {"error": "No file uploaded"}, 400
+
+    user_id = int(get_jwt_identity())
     file = request.files["file"]
-    return generate_dashboard(file)
+
+    try:
+        saved_dataset = save_user_dataset(user_id, file)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"error": f"Unable to save dataset: {str(exc)}"}), 500
+
+    result = generate_dashboard(saved_dataset["file_path"])
+    if "error" in result:
+        return jsonify(result), 400
+
+    result["filename"] = saved_dataset["filename"]
+    return jsonify(result)
 
 
 @app.route("/api/manual-data/save-analyze", methods=["POST"])
@@ -522,79 +724,20 @@ def save_and_analyze_manual_data():
 @app.route("/api/forecast", methods=["POST"])
 @jwt_required()
 def forecast_sales():
-    if sales_model is None:
-        return jsonify({"error": "Sales model not loaded from backend/sales_model.pkl"}), 500
-
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
 
     try:
-        horizon_days = 180
-        _, df = parse_forecast_csv(request.files["file"])
-
-        future_frame = build_future_frame(
-            last_date=df["date"].iloc[-1],
-            base_day_number=int(df["day_number"].iloc[-1]),
-            horizon_days=horizon_days,
-        )
-
-        sales_features = model_features(sales_model) or ["day_number", "month"]
-        sales_pred = sales_model.predict(pick_columns(future_frame, sales_features))
-
-        profit_pred = []
-        profit_features = model_features(profit_model)
-        if profit_model is not None and "expenses" in df.columns:
-            df["profit"] = df["sales"] - df["expenses"]
-            df["lag_1"] = df["profit"].shift(1)
-            df["rolling_7"] = df["profit"].rolling(7).mean()
-            df = df.dropna(subset=["profit", "lag_1", "rolling_7"]).copy()
-
-            if not df.empty:
-                rolling_window = df["profit"].tail(7).tolist()
-                last_profit = float(df["profit"].iloc[-1])
-                expected_profit_features = profit_features or [
-                    "day_number",
-                    "month",
-                    "day_of_week",
-                    "lag_1",
-                    "rolling_7",
-                ]
-
-                for _, row in future_frame.iterrows():
-                    point = row.to_dict()
-                    point["lag_1"] = last_profit
-                    point["rolling_7"] = float(np.mean(rolling_window))
-                    input_df = pd.DataFrame([point])
-                    predicted = float(
-                        profit_model.predict(pick_columns(input_df, expected_profit_features))[0]
-                    )
-                    profit_pred.append(predicted)
-                    rolling_window = (rolling_window + [predicted])[-7:]
-                    last_profit = predicted
-
-        category_breakdown = {}
-        if "category" in df.columns:
-            category_breakdown = df.groupby("category")["sales"].sum().to_dict()
-
-        return jsonify(
-            {
-                "future_days_180": future_frame["day_number"].tolist(),
-                "future_dates_180": future_frame["date"].dt.strftime("%Y-%m-%d").tolist(),
-                "sales_6_months": [float(value) for value in sales_pred],
-                "profit_6_months": [float(value) for value in profit_pred],
-                "category_breakdown": category_breakdown,
-                "models_loaded": {
-                    "sales_model": True,
-                    "profit_model": profit_model is not None,
-                    "sales_features": sales_features,
-                    "profit_features": profit_features,
-                },
-            }
-        )
+        user_id = int(get_jwt_identity())
+        saved_dataset = save_user_dataset(user_id, request.files["file"])
+        result, status_code = generate_forecast_result(saved_dataset["file_path"])
+        if status_code == 200:
+            result["filename"] = saved_dataset["filename"]
+        return jsonify(result), status_code
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     except Exception as exc:
-        return jsonify({"error": f"Forecast failed: {str(exc)}"}), 500
+        return jsonify({"error": f"Unable to save dataset: {str(exc)}"}), 500
 
 
 if __name__ == "__main__":

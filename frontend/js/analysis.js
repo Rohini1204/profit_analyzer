@@ -16,6 +16,13 @@ document.addEventListener("DOMContentLoaded", function () {
     );
 
     const analyzeBtn = document.getElementById("analyzeBtn");
+    const forecastBtn = document.getElementById("forecastBtn");
+    const downloadTemplateBtn = document.getElementById("downloadTemplateBtn");
+    const salesDuration = document.getElementById("salesDuration");
+    const profitDuration = document.getElementById("profitDuration");
+    const cumulativeSalesDuration = document.getElementById("cumulativeSalesDuration");
+    const cumulativeProfitDuration = document.getElementById("cumulativeProfitDuration");
+
     if (analyzeBtn) {
         analyzeBtn.addEventListener("click", async function () {
             const fileInput = document.getElementById("fileInput");
@@ -41,13 +48,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
 
-            updateDashboard(data);
+            applyAnalysisData(data);
             const report = storeAnalysisReport(data, ANALYSIS_STORAGE_KEY);
             initializeDownloadButtons(report, getStoredReport(FORECAST_STORAGE_KEY));
         });
     }
 
-    const downloadTemplateBtn = document.getElementById("downloadTemplateBtn");
     if (downloadTemplateBtn) {
         downloadTemplateBtn.addEventListener("click", function () {
             downloadAnalysisTemplate();
@@ -58,7 +64,6 @@ document.addEventListener("DOMContentLoaded", function () {
     let fullSales = [];
     let fullProfit = [];
 
-    const forecastBtn = document.getElementById("forecastBtn");
     if (forecastBtn) {
         forecastBtn.addEventListener("click", async function () {
             const fileInput = document.getElementById("fileInput");
@@ -87,15 +92,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
 
-            fullLabels = data.future_dates_180 || data.future_days_180 || [];
-            fullSales = data.sales_6_months || [];
-            fullProfit = data.profit_6_months || [];
-
-            setModelStatus(data.models_loaded);
-            setText("forecastNote", "Model forecast generated successfully.");
-            updateForecastCharts();
-            updateCategoryBreakdown(data.category_breakdown);
-
+            applyForecastData(data, "Model forecast generated successfully.");
             let report = storeForecastReport(data, FORECAST_STORAGE_KEY);
             setTimeout(() => {
                 const imageReport = attachForecastImagesToStoredReport(FORECAST_STORAGE_KEY);
@@ -104,11 +101,6 @@ document.addEventListener("DOMContentLoaded", function () {
             }, 450);
         });
     }
-
-    const salesDuration = document.getElementById("salesDuration");
-    const profitDuration = document.getElementById("profitDuration");
-    const cumulativeSalesDuration = document.getElementById("cumulativeSalesDuration");
-    const cumulativeProfitDuration = document.getElementById("cumulativeProfitDuration");
 
     [salesDuration, profitDuration, cumulativeSalesDuration, cumulativeProfitDuration].forEach(
         (select) => {
@@ -201,7 +193,7 @@ document.addEventListener("DOMContentLoaded", function () {
         setText("modelStatus", `Sales model: ${salesOk} | Profit model: ${profitOk}`);
     }
 
-    function updateDashboard(data) {
+    function applyAnalysisData(data) {
         setText("rev", "Rs " + data.total_revenue.toLocaleString());
         setText("profit", "Rs " + data.total_profit.toLocaleString());
         setText("margin", data.profit_margin + " %");
@@ -221,6 +213,69 @@ document.addEventListener("DOMContentLoaded", function () {
         setText("bottomProfit", formatRanking(data.bottom3_profit, "Rs"));
         setText("insight", data.insight || "No insight generated.");
     }
+
+    function applyForecastData(data, successMessage) {
+        fullLabels = data.future_dates_180 || data.future_days_180 || [];
+        fullSales = data.sales_6_months || [];
+        fullProfit = data.profit_6_months || [];
+
+        setModelStatus(data.models_loaded);
+        setText("forecastNote", successMessage);
+        updateForecastCharts();
+        updateCategoryBreakdown(data.category_breakdown);
+    }
+
+    async function restoreStoredDataset() {
+        const includeAnalysis = analyzeBtn ? "true" : "false";
+        const includeForecast = forecastBtn ? "true" : "false";
+
+        try {
+            const response = await fetch(
+                `${API}/user-dataset?include_analysis=${includeAnalysis}&include_forecast=${includeForecast}`,
+                {
+                    method: "GET",
+                    headers: { Authorization: "Bearer " + token },
+                }
+            );
+
+            const data = await response.json();
+            if (!response.ok) {
+                return;
+            }
+
+            if (!data.dataset_exists) {
+                localStorage.removeItem(ANALYSIS_STORAGE_KEY);
+                localStorage.removeItem(FORECAST_STORAGE_KEY);
+                initializeDownloadButtons(null, null);
+                return;
+            }
+
+            if (data.analysis_data && analyzeBtn) {
+                applyAnalysisData(data.analysis_data);
+                storeAnalysisReport(data.analysis_data, ANALYSIS_STORAGE_KEY);
+            }
+
+            if (data.forecast_data && forecastBtn) {
+                applyForecastData(data.forecast_data, "Previous forecast restored.");
+                let report = storeForecastReport(data.forecast_data, FORECAST_STORAGE_KEY);
+                setTimeout(() => {
+                    const imageReport = attachForecastImagesToStoredReport(FORECAST_STORAGE_KEY);
+                    report = imageReport || report;
+                    initializeDownloadButtons(getStoredReport(ANALYSIS_STORAGE_KEY), report);
+                }, 450);
+                return;
+            }
+
+            initializeDownloadButtons(
+                getStoredReport(ANALYSIS_STORAGE_KEY),
+                getStoredReport(FORECAST_STORAGE_KEY)
+            );
+        } catch (error) {
+            // Keep the current empty/default UI if dataset restore fails.
+        }
+    }
+
+    restoreStoredDataset();
 });
 
 function initializeDownloadButtons(analysisReport, forecastReport) {
@@ -1123,7 +1178,22 @@ function renderChart(containerId, labels, values, label) {
     });
 }
 
-function logout() {
+async function logout() {
+    const token = localStorage.getItem("token");
+
+    if (token) {
+        try {
+            await fetch("/api/logout", {
+                method: "POST",
+                headers: {
+                    Authorization: "Bearer " + token,
+                },
+            });
+        } catch (error) {
+            // Ignore logout API failures and clear the local token anyway.
+        }
+    }
+
     localStorage.removeItem("token");
     window.location.href = "login.html";
 }
