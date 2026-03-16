@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, session
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity, jwt_required
 import os
@@ -19,11 +19,13 @@ app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "super-secret-key")
+app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY", app.config["JWT_SECRET_KEY"])
 app.config["JWT_TOKEN_LOCATION"] = ["headers"]
 app.config["JWT_HEADER_NAME"] = "Authorization"
 app.config["JWT_HEADER_TYPE"] = "Bearer"
 
 jwt = JWTManager(app)
+MANAGER_PASSWORD = os.getenv("MANAGER_PASSWORD", "ManagerLogin@123")
 
 
 def init_db():
@@ -39,10 +41,15 @@ def init_db():
                 email TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL,
                 role TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                login_time TIMESTAMP,
+                logout_time TIMESTAMP
             );
             """
         )
+
+        cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS login_time TIMESTAMP;")
+        cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS logout_time TIMESTAMP;")
 
         cur.execute(
             """
@@ -193,6 +200,18 @@ def fetch_user_profile(user_id):
     return row
 
 
+def manager_access_granted():
+    return bool(session.get("manager_access"))
+
+
+def serialize_user_row(row):
+    serialized = dict(row)
+    for key in ("created_at", "login_time", "logout_time"):
+        value = serialized.get(key)
+        serialized[key] = value.isoformat() if value else None
+    return serialized
+
+
 @app.route("/")
 def home():
     return send_from_directory(FRONTEND_PATH, "index.html")
@@ -222,8 +241,122 @@ def login():
     user = login_user(data["email"], data["password"])
     if not user:
         return jsonify({"msg": "Invalid Login"}), 401
+
+    db = get_db()
+    cur = db.cursor()
+    try:
+        cur.execute(
+            "UPDATE users SET login_time=CURRENT_TIMESTAMP, logout_time=NULL WHERE id=%s",
+            (user["id"],),
+        )
+        db.commit()
+    finally:
+        cur.close()
+        db.close()
+
     token = create_access_token(identity=str(user["id"]))
     return jsonify({"token": token})
+
+
+@app.route("/api/logout", methods=["POST"])
+@jwt_required()
+def logout():
+    user_id = int(get_jwt_identity())
+    db = get_db()
+    cur = db.cursor()
+
+    try:
+        cur.execute("UPDATE users SET logout_time=CURRENT_TIMESTAMP WHERE id=%s", (user_id,))
+        db.commit()
+    finally:
+        cur.close()
+        db.close()
+
+    return jsonify({"msg": "Logged out successfully"})
+
+
+@app.route("/api/manager-login", methods=["POST"])
+def manager_login():
+    data = request.get_json(force=True)
+    password = str(data.get("password", ""))
+    access = password == MANAGER_PASSWORD
+
+    if access:
+        session["manager_access"] = True
+    else:
+        session.pop("manager_access", None)
+
+    return jsonify({"access": access})
+
+
+@app.route("/api/manager/users", methods=["GET"])
+def get_manager_users():
+    if not manager_access_granted():
+        return jsonify({"error": "Manager access required"}), 403
+
+    db = get_db()
+    cur = get_dict_cursor(db)
+
+    try:
+        cur.execute(
+            """
+            SELECT
+                id,
+                name,
+                email,
+                role,
+                created_at,
+                login_time,
+                logout_time,
+                CASE
+                    WHEN login_time IS NOT NULL AND logout_time IS NOT NULL
+                    THEN (logout_time - login_time)::text
+                    ELSE NULL
+                END AS session_duration
+            FROM users
+            ORDER BY id ASC
+            """
+        )
+        users = [serialize_user_row(row) for row in cur.fetchall()]
+    finally:
+        cur.close()
+        db.close()
+
+    return jsonify(users)
+
+
+@app.route("/api/manager/reset-password", methods=["POST"])
+def manager_reset_password():
+    if not manager_access_granted():
+        return jsonify({"error": "Manager access required"}), 403
+
+    payload = request.get_json(force=True)
+    user_id = payload.get("user_id")
+    new_password = str(payload.get("new_password", ""))
+
+    if not user_id or not new_password:
+        return jsonify({"error": "user_id and new_password are required"}), 400
+
+    if len(new_password) < 6:
+        return jsonify({"error": "New password must be at least 6 characters long."}), 400
+
+    db = get_db()
+    cur = db.cursor()
+
+    try:
+        cur.execute(
+            "UPDATE users SET password=%s WHERE id=%s",
+            (generate_password_hash(new_password), user_id),
+        )
+        if cur.rowcount == 0:
+            db.rollback()
+            return jsonify({"error": "User not found"}), 404
+        db.commit()
+    finally:
+        cur.close()
+        db.close()
+
+    return jsonify({"msg": "Password reset successfully"})
 
 
 @app.route("/api/profile", methods=["GET"])
