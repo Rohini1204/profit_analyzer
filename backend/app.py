@@ -4,7 +4,6 @@ from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity
 import os
 import pickle
 import re
-import time
 import psycopg2
 from werkzeug.security import check_password_hash, generate_password_hash
 import numpy as np
@@ -71,6 +70,18 @@ def init_db():
                 filename TEXT,
                 file_path TEXT,
                 uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """
+        )
+
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_sessions (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                login_time TIMESTAMP,
+                logout_time TIMESTAMP,
+                time_spent_minutes INTEGER
             );
             """
         )
@@ -398,7 +409,22 @@ def login():
     if not user:
         return jsonify({"msg": "Invalid Login"}), 401
 
-    session["login_start_time"] = time.time()
+    db = get_db()
+    cur = db.cursor()
+    try:
+        cur.execute(
+            """
+            INSERT INTO user_sessions (user_id, login_time)
+            VALUES (%s, CURRENT_TIMESTAMP)
+            RETURNING id
+            """,
+            (user["id"],),
+        )
+        session["current_session_id"] = cur.fetchone()[0]
+        db.commit()
+    finally:
+        cur.close()
+        db.close()
 
     token = create_access_token(identity=str(user["id"]))
     return jsonify({"token": token})
@@ -408,21 +434,30 @@ def login():
 @jwt_required()
 def logout():
     user_id = int(get_jwt_identity())
-    login_start_time = session.pop("login_start_time", None)
-    elapsed_minutes = 0
+    current_session_id = session.pop("current_session_id", None)
 
-    if login_start_time is not None:
-        try:
-            elapsed_seconds = max(0, int(time.time() - float(login_start_time)))
-            elapsed_minutes = elapsed_seconds // 60
-        except (TypeError, ValueError):
-            elapsed_minutes = 0
-
-    if elapsed_minutes > 0:
+    if current_session_id is not None:
         db = get_db()
         cur = db.cursor()
 
         try:
+            cur.execute(
+                """
+                UPDATE user_sessions
+                SET
+                    logout_time = CURRENT_TIMESTAMP,
+                    time_spent_minutes = GREATEST(
+                        0,
+                        FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - login_time)) / 60)
+                    )::INTEGER
+                WHERE id=%s
+                RETURNING COALESCE(time_spent_minutes, 0)
+                """,
+                (current_session_id,),
+            )
+            row = cur.fetchone()
+            elapsed_minutes = int(row[0]) if row and row[0] is not None else 0
+
             cur.execute(
                 """
                 UPDATE users
@@ -512,6 +547,35 @@ def get_manager_users():
         db.close()
 
     return jsonify(users)
+
+
+@app.route("/api/manager/user-sessions/<int:user_id>", methods=["GET"])
+def get_manager_user_sessions(user_id):
+    if not manager_access_granted():
+        return jsonify({"error": "Manager access required"}), 403
+
+    db = get_db()
+    cur = get_dict_cursor(db)
+
+    try:
+        cur.execute(
+            """
+            SELECT
+                TO_CHAR(login_time, 'YYYY-MM-DD HH24:MI') AS login_time,
+                TO_CHAR(logout_time, 'YYYY-MM-DD HH24:MI') AS logout_time,
+                COALESCE(time_spent_minutes, 0) AS time_spent_minutes
+            FROM user_sessions
+            WHERE user_id=%s
+            ORDER BY login_time DESC, id DESC
+            """,
+            (user_id,),
+        )
+        sessions = [dict(row) for row in cur.fetchall()]
+    finally:
+        cur.close()
+        db.close()
+
+    return jsonify(sessions)
 
 
 @app.route("/api/manager/reset-password", methods=["POST"])

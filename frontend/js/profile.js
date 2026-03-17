@@ -106,6 +106,13 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     managerUsersBody.addEventListener("click", async (event) => {
+        const historyButton = event.target.closest(".manager-history-toggle");
+        if (historyButton) {
+            const userId = Number(historyButton.dataset.userId);
+            await toggleUserSessionHistory(userId);
+            return;
+        }
+
         const toggleButton = event.target.closest(".manager-reset-toggle");
         if (toggleButton) {
             const userId = toggleButton.dataset.userId;
@@ -172,7 +179,7 @@ async function loadManagerUsers() {
     const dashboard = document.getElementById("managerDashboard");
     const tbody = document.getElementById("managerUsersBody");
     dashboard.style.display = "block";
-    tbody.innerHTML = '<tr><td colspan="6">Loading users...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7">Loading users...</td></tr>';
 
     try {
         const response = await fetch(API + "/manager/users", {
@@ -200,7 +207,7 @@ function renderManagerUsers(users) {
     const tbody = document.getElementById("managerUsersBody");
 
     if (!users.length) {
-        tbody.innerHTML = '<tr><td colspan="6">No users found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7">No users found.</td></tr>';
         return;
     }
 
@@ -225,10 +232,84 @@ function renderManagerUsers(users) {
                             <button type="button" class="btn manager-reset-save" data-user-id="${user.id}">Save</button>
                         </div>
                     </td>
+                    <td style="padding: 10px 8px; border-top: 1px solid #dfe9e3;">
+                        <button type="button" class="btn manager-history-toggle" data-user-id="${user.id}">Login Time</button>
+                    </td>
+                </tr>
+                <tr id="historyRow-${user.id}" style="display: none;">
+                    <td colspan="7" style="padding: 12px 8px; border-top: 1px solid #dfe9e3; background: #f7faf8;">
+                        <div id="historyPanel-${user.id}">No history loaded.</div>
+                    </td>
                 </tr>
             `
         )
         .join("");
+}
+
+async function toggleUserSessionHistory(userId) {
+    const historyRow = document.getElementById(`historyRow-${userId}`);
+    const historyPanel = document.getElementById(`historyPanel-${userId}`);
+
+    if (!historyRow || !historyPanel) {
+        return;
+    }
+
+    if (historyRow.style.display === "table-row" && historyPanel.dataset.loaded === "true") {
+        historyRow.style.display = "none";
+        return;
+    }
+
+    historyRow.style.display = "table-row";
+    historyPanel.innerHTML = "Loading login history...";
+
+    try {
+        const response = await fetch(API + `/manager/user-sessions/${userId}`, {
+            method: "GET",
+            credentials: "same-origin",
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+            historyPanel.innerHTML = escapeHtml(data.error || "Unable to load login history.");
+            return;
+        }
+
+        historyPanel.dataset.loaded = "true";
+        historyPanel.innerHTML = buildSessionHistoryTable(data);
+    } catch (error) {
+        historyPanel.innerHTML = "Network/API error while loading login history.";
+    }
+}
+
+function buildSessionHistoryTable(sessions) {
+    if (!sessions.length) {
+        return "No login history found for this user.";
+    }
+
+    const rows = sessions
+        .map(
+            (entry) => `
+                <tr>
+                    <td style="padding: 8px; border-top: 1px solid #dfe9e3;">${escapeHtml(entry.login_time || "--")}</td>
+                    <td style="padding: 8px; border-top: 1px solid #dfe9e3;">${escapeHtml(entry.logout_time || "--")}</td>
+                    <td style="padding: 8px; border-top: 1px solid #dfe9e3;">${Number(entry.time_spent_minutes || 0)}</td>
+                </tr>
+            `
+        )
+        .join("");
+
+    return `
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr>
+                    <th align="left">Login Time</th>
+                    <th align="left">Logout Time</th>
+                    <th align="left">Time Spent (minutes)</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
 }
 
 async function resetUserPassword(userId, newPassword) {
