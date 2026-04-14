@@ -5,8 +5,10 @@ from config import Config
 
 def get_db():
     if Config.DATABASE_URL:
-        return psycopg2.connect(Config.DATABASE_URL)
-
+        return psycopg2.connect(
+    Config.DATABASE_URL,
+    sslmode="require"
+)
     return psycopg2.connect(
         host=Config.DB_HOST,
         user=Config.DB_USER,
